@@ -126,6 +126,14 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
 // holds when the active object returns to its caller
 pred return {
   // FILL IN HERE
+  // there are elements in the callstack set
+  not Stack.callstack.isEmpty
+  // update the callstack
+  Stack.callstack = Stack.callstack.delete[Stack.callstack.lastIdx]
+
+  Invocation.op = Return
+  // no param for Return inv, then just ignore Invocation.param ???
+  // need to check that all objs remain unchanged ????
 }
 
 
