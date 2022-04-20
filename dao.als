@@ -90,6 +90,9 @@ fun returnee: Object {
 
 pred objects_unchanged[objs: set Object] {
   // FILL IN THIS DEFINITION
+  all obj : objs | obj.balance' = obj.balance
+  all dao : DAO & objs | dao.credit' = dao.credit
+  //all o : objs | o in DAO => o.credit' = o.credit
 }
 
 check all_objects_unchanged_correct {
@@ -120,6 +123,17 @@ check object_unchanged_balance {
 // 'dest'. If 'amt' is 0, no funds are transferred.
 pred call[dest: Object, arg: lone Data, amt: one Int] {
   // FILL IN HERE
+  amt >= 0 and amt <= active_obj.balance
+  // TODO: how to check if the stack reaches its max ???
+  // Stack.callstack.add [{(caller = active_obj), (callee=dest)}]
+  one sf : StackFrame | 
+    sf.caller = active_obj and 
+    sf.callee = dest and 
+    Stack.callstack' = Stack.callstack.add[sf]
+  Invocation.op = Call
+  Invocation.param = arg
+  active_obj.balance' = active_obj.balance - amt
+  dest.balance' = dest.balance + amt
 }
 
 // return
@@ -129,11 +143,13 @@ pred return {
   // there are elements in the callstack set
   not Stack.callstack.isEmpty
   // update the callstack
-  Stack.callstack = Stack.callstack.delete[Stack.callstack.lastIdx]
-
+  Stack.callstack' = Stack.callstack.delete[Stack.callstack.lastIdx]
   Invocation.op = Return
-  // no param for Return inv, then just ignore Invocation.param ???
-  // need to check that all objs remain unchanged ????
+  Invocation.param = none
+  // all non-dao objs unchanged
+  objects_unchanged[Object - DAO]
+  // If the active object who did the return is not The DAO, then no object’s credit can change.
+  // TODO: need a check for the above ???
 }
 
 
