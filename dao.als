@@ -169,8 +169,10 @@ pred dao_withdraw_call {
   active_obj = DAO and Invocation.op = Call
 
   // DAO credit doesn't change (the caller's credit is deducted after the call below returns
-  credit' = credit
+  //credit' = credit
 
+  // update credit and make call at the same time
+  DAO.credit' = DAO.credit ++ (sender -> 0)
   call[Invocation.param, none, DAO.credit[sender]]
 }
 
@@ -184,7 +186,7 @@ pred dao_withdraw_return {
   active_obj = DAO and Invocation.op = Return
 
   // set sender's credit to 0 since their credit has now been emptied
-  DAO.credit' = DAO.credit ++ (sender -> 0)
+  //DAO.credit' = DAO.credit ++ (sender -> 0)
   
   return
 }
