@@ -130,7 +130,9 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
     sf.caller = active_obj and 
     sf.callee = dest and 
     Stack.callstack' = Stack.callstack.add[sf]
+  // TODO: Invocation.op' = Call ??
   Invocation.op = Call
+  // TODO: Invocation.param' = arg ???
   Invocation.param = arg
   active_obj.balance' = active_obj.balance - amt
   dest.balance' = dest.balance + amt
@@ -144,7 +146,9 @@ pred return {
   not Stack.callstack.isEmpty
   // update the callstack
   Stack.callstack' = Stack.callstack.delete[Stack.callstack.lastIdx]
+  // TODO: Invocation.op' = Return ???
   Invocation.op = Return
+  // TODO: Invocation.param' = none ??
   Invocation.param = none
   // all non-dao objs unchanged
   objects_unchanged[Object - DAO]
