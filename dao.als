@@ -130,8 +130,8 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
     sf.caller = active_obj and 
     sf.callee = dest and 
     Stack.callstack' = Stack.callstack.add[sf]
-  Invocation.op' = Call
-  Invocation.param' = arg
+  Invocation.op = Call
+  Invocation.param = arg
   active_obj.balance' = active_obj.balance - amt
   dest.balance' = dest.balance + amt
   all other : Object - (active_obj + dest) | other.balance' = other.balance
@@ -150,8 +150,8 @@ pred return {
   not Stack.callstack.isEmpty
   // update the callstack
   Stack.callstack' = Stack.callstack.delete[Stack.callstack.lastIdx]
-  Invocation.op' = Return
-  Invocation.param' = none
+  Invocation.op = Return
+  Invocation.param = none
   // all non-dao objs unchanged
   all o : Object | o.balance' = o.balance
   // If the active object who did the return is not The DAO, then no object’s credit can change.
