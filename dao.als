@@ -257,7 +257,13 @@ fact init {
 // DAO Invariant
 
 pred DAO_inv {
- // FILL IN HERE
+  // FILL IN HERE
+
+  // DAO's balance is sufficient to cover all other objects' credits
+  DAO.balance >= sum_DAO_credit
+
+  // Credit of each other object is non-negative
+  all o : (Object - DAO) | DAO.credit[o] >= 0
 }
 
 
