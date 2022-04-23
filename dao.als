@@ -90,6 +90,8 @@ fun returnee: Object {
 
 pred objects_unchanged[objs: set Object] {
   // FILL IN THIS DEFINITION
+  all obj : objs | obj.balance' = obj.balance
+  DAO in objs => DAO.credit' = DAO.credit
 }
 
 check all_objects_unchanged_correct {
