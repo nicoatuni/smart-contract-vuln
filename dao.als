@@ -126,7 +126,7 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
   // can only occur when:
   // - `amt` >= 0
   // - `amt` doesn't exceed balance of currently active object
-  amt => 0 and amt =< active_object.balance
+  amt >= 0 and amt =< active_object.balance
 
   // TODO: check if stack has not exceeded its max length bound?
 
@@ -141,10 +141,10 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
   Invocation.param' = arg
 
   // deduct `amt` from balance of active object
-  active_object.balance' = minus[active_object.balance, amt]
+  active_object.balance' = sub[active_object.balance, amt]
 
   // add `amt` to balance of `dest`
-  dest.balance' = plus[dest.balance, amt]
+  dest.balance' = add[dest.balance, amt]
 
   // balance of all other objects are unchanged
   all o : (Object - active_object - dest) | o.balance' = o.balance
