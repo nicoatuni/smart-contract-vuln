@@ -151,10 +151,10 @@ pred return {
   // TODO: Invocation.param' = none ??
   Invocation.param = none
   // all non-dao objs unchanged
-  objects_unchanged[Object - DAO]
+  all o : Object | o.balance' = o.balance
   // If the active object who did the return is not The DAO, then no object’s credit can change.
   // TODO: need a check for the above ???
-}
+  }
 
 
 
