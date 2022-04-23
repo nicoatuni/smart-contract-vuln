@@ -128,6 +128,22 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
 // holds when the active object returns to its caller
 pred return {
   // FILL IN HERE
+
+  // callstack cannot be empty
+  not Stack.callstack.isEmpty
+
+  // set invocation
+  Invocation.op' = Return
+  Invocation.param' = none
+
+  // pop top stack frame from the stack
+  Stack.callstack' = Stack.callstack.butlast
+
+  // balance of all objects cannot change
+  all o : Object | o.balance' = o.balance
+
+  // if active object who returned is not the DAO, then no credit can change
+  DAO not in active_obj => DAO.credit' = DAO.credit
 }
 
 
