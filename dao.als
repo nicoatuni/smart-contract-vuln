@@ -134,6 +134,12 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
   Invocation.param' = arg
   active_obj.balance' = active_obj.balance - amt
   dest.balance' = dest.balance + amt
+  all other : Object - (active_obj + dest) | other.balance' = other.balance
+  // If the active object who made the call is not The DAO, then no object’s credit can change.
+  active_obj & DAO = none => 
+    all obj : DAO.credit.Int | 
+      DAO.credit[obj]' = DAO.credit[obj]
+  // ??????????????????????????
 }
 
 // return
