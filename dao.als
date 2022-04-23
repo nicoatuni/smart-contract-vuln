@@ -122,6 +122,35 @@ check object_unchanged_balance {
 // 'dest'. If 'amt' is 0, no funds are transferred.
 pred call[dest: Object, arg: lone Data, amt: one Int] {
   // FILL IN HERE
+
+  // can only occur when:
+  // - `amt` >= 0
+  // - `amt` doesn't exceed balance of currently active object
+  amt => 0 and amt =< active_object.balance
+
+  // TODO: check if stack has not exceeded its max length bound?
+
+  // push new stack frame onto stack
+  some sf : StackFrame |
+    sf.caller = active_object and
+    sf.callee = dest and
+    Stack.callstack' = Stack.callstack.add[sf]
+
+  // update `Invocation`
+  Invocation.op' = Call
+  Invocation.param' = arg
+
+  // deduct `amt` from balance of active object
+  active_object.balance' = minus[active_object.balance, amt]
+
+  // add `amt` to balance of `dest`
+  dest.balance' = plus[dest.balance, amt]
+
+  // balance of all other objects are unchanged
+  all o : (Object - active_object - dest) | o.balance' = o.balance
+
+  // if active object is not the DAO, then no credit can change
+  active_obj != DAO => DAO.credit' = DAO.credit
 }
 
 // return
