@@ -172,7 +172,7 @@ pred return {
   all o : Object | o.balance' = o.balance
 
   // if active object who returned is not the DAO, then no credit can change
-  DAO not in active_obj => DAO.credit' = DAO.credit
+  active_obj != DAO => DAO.credit' = DAO.credit
 }
 
 
