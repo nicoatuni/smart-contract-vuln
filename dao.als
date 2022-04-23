@@ -238,9 +238,13 @@ fact init {
 // DAO Invariant
 
 pred DAO_inv {
- // FILL IN HERE
+  // FILL IN HERE
+  all dao : DAO |
+    dao.balance = sum_DAO_credit and
+    // use the relational join (.) to get the domain of the dao.credit, i.e. all objects the dao is storing credit for
+    all o : dao.credit.Int |
+      o.balance >= 0
 }
-
 
 //////////////////////////////////////////////////////////////////////
 // Finding the attack
