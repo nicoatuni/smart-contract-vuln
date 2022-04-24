@@ -126,13 +126,13 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
   // can only occur when:
   // - `amt` >= 0
   // - `amt` doesn't exceed balance of currently active object
-  amt >= 0 and amt =< active_object.balance
+  amt >= 0 and amt =< active_obj.balance
 
   // TODO: check if stack has not exceeded its max length bound?
 
   // push new stack frame onto stack
   some sf : StackFrame |
-    sf.caller = active_object and
+    sf.caller = active_obj and
     sf.callee = dest and
     Stack.callstack' = Stack.callstack.add[sf]
 
@@ -141,13 +141,13 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
   Invocation.param' = arg
 
   // deduct `amt` from balance of active object
-  active_object.balance' = sub[active_object.balance, amt]
+  active_obj.balance' = sub[active_obj.balance, amt]
 
   // add `amt` to balance of `dest`
   dest.balance' = add[dest.balance, amt]
 
   // balance of all other objects are unchanged
-  all o : (Object - active_object - dest) | o.balance' = o.balance
+  all o : (Object - active_obj - dest) | o.balance' = o.balance
 
   // if active object is not the DAO, then no credit can change
   active_obj != DAO => DAO.credit' = DAO.credit
@@ -266,6 +266,15 @@ pred DAO_inv {
   all o : (Object - DAO) | DAO.credit[o] >= 0
 }
 
+// Enable below code to see the case when `DAO_inv` doesn't hold
+// TODO: remove this before submission
+/*
+assert inv_always {
+  always DAO_inv
+}
+
+check inv_always
+*/
 
 //////////////////////////////////////////////////////////////////////
 // Finding the attack
