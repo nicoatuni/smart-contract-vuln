@@ -300,3 +300,68 @@ assert no_infinite_withdrawal {
 }
 
 check no_infinite_withdrawal for 7 seq
+
+// check that objects can transfer balance to another non-DAO object
+objs_can_transfer_balance: run {
+  some o1, o2 : (Object - DAO), arg : Data |
+  {
+    o1.balance = 1
+    o2.balance = 0
+    active_obj = o1
+    call[o2, arg, 1]
+    after {
+      active_obj = o2
+      o1.balance = 0
+      o2.balance = 1
+    }
+  }
+} for 5
+
+// check that objects can transfer credit to another non-DAO object
+objs_can_transfer_credit: run {
+  some o1, o2 : (Object - DAO) |
+    {
+      o1.balance = 1
+      o2.balance = 0
+      active_obj = o1
+      DAO.balance = 1
+      DAO.credit[o1] = 1
+      call[DAO, o2, 0]
+      after {
+        dao_withdraw_call
+        after {
+          o2.balance = 1
+          DAO.credit[o1] = 0
+        }
+      }
+    }
+} for 5
+
+// check that objects can withdraw credit for themselves
+objs_can_withdraw_to_self: run {
+  some objA : (Object - DAO) |
+  {
+    #(Stack.callstack) = 1
+    objA.balance = 1
+    active_obj = objA
+    DAO.balance = 1
+    DAO.credit[objA] = 1
+    call[DAO, objA, 0]
+    after {
+      dao_withdraw_call
+      after {
+        DAO.credit[objA] = 0
+        objA.balance = 2
+        active_obj = objA
+        return
+        after {
+          active_obj != objA
+          DAO.credit[objA] = 0
+          objA.balance = 2
+          dao_withdraw_return
+          after (#(Stack.callstack) = 1)
+        }
+      }
+    }
+  }
+} for 5
