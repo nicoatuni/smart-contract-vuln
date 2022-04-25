@@ -136,9 +136,9 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
   dest.balance' = dest.balance + amt
   all other : Object - (active_obj + dest) | other.balance' = other.balance
   // If the active object who made the call is not The DAO, then no object’s credit can change.
-  active_obj & DAO = none => 
-    all obj : DAO.credit.Int | 
-      DAO.credit[obj]' = DAO.credit[obj]
+  // active_obj & DAO = none => 
+  //   all obj : DAO.credit.Int | 
+  //     DAO.credit[obj]' = DAO.credit[obj]
   // ??????????????????????????
 }
 
@@ -249,6 +249,15 @@ pred DAO_inv {
     all o : dao.credit.Int |
       o.balance >= 0
 }
+
+assert q3 {
+  DAO_inv
+  untrusted_action
+  Stack.callstack.last.caller != Stack.callstack[Stack.callstack.lastIdx - 2].caller
+  Stack.callstack.last.callee != Stack.callstack[Stack.callstack.lastIdx - 2].callee
+}
+
+check q3 for 7 seq
 
 //////////////////////////////////////////////////////////////////////
 // Finding the attack
