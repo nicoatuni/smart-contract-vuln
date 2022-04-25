@@ -268,39 +268,44 @@ pred DAO_inv {
   all o : (Object - DAO) | DAO.credit[o] >= 0
 }
 
-// Enable below code to see the case when `DAO_inv` doesn't hold
-// TODO: remove this before submission
-/*
-assert inv_always {
-  always DAO_inv
-}
-
-check inv_always
-*/
 
 //////////////////////////////////////////////////////////////////////
 // Finding the attack
 
 // FILL IN HERE
 
+// TODO: clean up before submission
 assert no_infinite_withdrawal {
 // stack could only contain one stackframe of an object calling the DAO?
+  always {
+    all sf : StackFrame, o : (Object - DAO) |
+    (sf.caller = o and sf.callee = DAO and sf in Stack.callstack.elems) => one Stack.callstack.indsOf[sf]
+  }
+
 //  always {
-//    all sf : StackFrame, o : (Object - DAO) |
-//    (sf.caller = o and sf.callee = DAO and sf in Stack.callstack.elems) => one Stack.callstack.indsOf[sf]
+//    all sf : Stack.callstack.elems, o : (Object - DAO) |
+//    (sf.caller = o and sf.callee = DAO) => one Stack.callstack.indsOf[sf]
 //  }
 
   // for all non-DAO objects, if calling the DAO on the object results in the
   // invariant not holding, it should be the case that eventually the op
   // `dao_withdraw_return` holds and the invariant gets restored
-  all o : (Object - DAO), amt : one Int |
-  {
-      call[DAO, o, amt] and
-      after (dao_withdraw_call and after (not DAO_inv))
-  } => after after (eventually (dao_withdraw_return and DAO_inv))
+//   all o : (Object - DAO), amt : one Int |
+//   {
+//    active_obj != DAO and
+//     call[DAO, o, amt] and
+//     after (dao_withdraw_call and after (not DAO_inv))
+//   } => after after (eventually (dao_withdraw_return and DAO_inv))
+
+  // (dao_withdraw_call and after (not DAO_inv)) => after (eventually DAO_inv)
+
+//  all o : (Object - DAO), amt : one Int |
+//  {
+//    (active_obj != DAO and call[DAO, o, amt]) => after (eventually DAO_inv)
+//  }
 }
 
-check no_infinite_withdrawal for 7 seq
+check no_infinite_withdrawal
 
 // check that objects can transfer balance to another non-DAO object
 objs_can_transfer_balance: run {
@@ -316,7 +321,7 @@ objs_can_transfer_balance: run {
       o2.balance = 1
     }
   }
-} for 5
+} for 3
 
 // check that objects can transfer credit to another non-DAO object
 objs_can_transfer_credit: run {
@@ -336,7 +341,7 @@ objs_can_transfer_credit: run {
         }
       }
     }
-} for 5
+} for 3
 
 // check that objects can withdraw credit for themselves
 objs_can_withdraw_to_self: run {
@@ -365,4 +370,4 @@ objs_can_withdraw_to_self: run {
       }
     }
   }
-} for 5
+} for 3
