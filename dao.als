@@ -92,6 +92,8 @@ pred objects_unchanged[objs: set Object] {
   // FILL IN THIS DEFINITION
   all obj : objs | obj.balance' = obj.balance
   DAO in objs => DAO.credit' = DAO.credit
+  // or the below
+  // all dao : DAO & objs | dao.credit' = dao.credit
 }
 
 check all_objects_unchanged_correct {
@@ -126,12 +128,10 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
   // can only occur when:
   // - `amt` >= 0
   // - `amt` doesn't exceed balance of currently active object
-  amt >= 0 and amt =< active_obj.balance
-
-  // TODO: check if stack has not exceeded its max length bound?
+  amt >= 0 and amt <= active_obj.balance
 
   // push new stack frame onto stack
-  some sf : StackFrame |
+  one sf : StackFrame |
     sf.caller = active_obj and
     sf.callee = dest and
     Stack.callstack' = Stack.callstack.add[sf]
