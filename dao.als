@@ -131,7 +131,7 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
   // TODO: check if stack has not exceeded its max length bound?
 
   // push new stack frame onto stack
-  some sf : StackFrame |
+  one sf : StackFrame |
     sf.caller = active_obj and
     sf.callee = dest and
     Stack.callstack' = Stack.callstack.add[sf]
