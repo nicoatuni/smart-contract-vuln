@@ -130,11 +130,12 @@ pred call[dest: Object, arg: lone Data, amt: one Int] {
   // - `amt` doesn't exceed balance of currently active object
   amt >= 0 and amt <= active_obj.balance
 
-  // push new stack frame onto stack
+  // push new stack frame onto stack if not exceeding seq length bound
   one sf : StackFrame |
     sf.caller = active_obj and
     sf.callee = dest and
-    Stack.callstack' = Stack.callstack.add[sf]
+    Stack.callstack' = Stack.callstack.add[sf] and
+    #(Stack.callstack') = add[#(Stack.callstack), 1]
 
   // update `Invocation`
   Invocation.op' = Call
