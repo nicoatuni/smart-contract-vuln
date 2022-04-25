@@ -1,6 +1,6 @@
 // SWEN90010 2022 Assignment 2
 //
-// Submission by: <insert your names and student numbers here>
+// Submission by: Liguo Chen (851090) and Nico Eka Dinata (770318)
 
 //////////////////////////////////////////////////////////////////////
 // don't delete this line (imposes an ordering on the atoms in the Object set
