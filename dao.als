@@ -186,8 +186,9 @@ pred dao_withdraw_call {
   active_obj = DAO and Invocation.op = Call
 
   // DAO credit doesn't change (the caller's credit is deducted after the call below returns
-  credit' = credit
+  // credit' = credit // VULN: comment this to fix vuln.
 
+  DAO.credit' = DAO.credit ++ (sender -> 0) // VULN: uncomment this to fix vuln.
   call[Invocation.param, none, DAO.credit[sender]]
 }
 
@@ -201,7 +202,7 @@ pred dao_withdraw_return {
   active_obj = DAO and Invocation.op = Return
 
   // set sender's credit to 0 since their credit has now been emptied
-  DAO.credit' = DAO.credit ++ (sender -> 0)
+  // DAO.credit' = DAO.credit ++ (sender -> 0) // VULN: comment this to fix vuln.
   
   return
 }
@@ -281,3 +282,21 @@ check inv_always
 
 // FILL IN HERE
 
+assert no_infinite_withdrawal {
+// stack could only contain one stackframe of an object calling the DAO?
+//  always {
+//    all sf : StackFrame, o : (Object - DAO) |
+//    (sf.caller = o and sf.callee = DAO and sf in Stack.callstack.elems) => one Stack.callstack.indsOf[sf]
+//  }
+
+  // for all non-DAO objects, if calling the DAO on the object results in the
+  // invariant not holding, it should be the case that eventually the op
+  // `dao_withdraw_return` holds and the invariant gets restored
+  all o : (Object - DAO), amt : one Int |
+  {
+      call[DAO, o, amt] and
+      after (dao_withdraw_call and after (not DAO_inv))
+  } => after after (eventually (dao_withdraw_return and DAO_inv))
+}
+
+check no_infinite_withdrawal for 7 seq
