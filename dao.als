@@ -187,9 +187,16 @@ pred dao_withdraw_call {
   active_obj = DAO and Invocation.op = Call
 
   // DAO credit doesn't change (the caller's credit is deducted after the call below returns
-  // credit' = credit // VULN: comment this to fix vuln.
+  // VULNERABILITY_FIX: this no longer holds because we _do_ want to update
+  // the credit of the calling object to 0 atomically with the DAO transferring
+  // some its balance to another object.
+  // credit' = credit
 
-  DAO.credit' = DAO.credit ++ (sender -> 0) // VULN: uncomment this to fix vuln.
+  // VULNERABILITY_FIX: this gets added to make sure the transferring of the
+  // DAO's balance and the updating of the object's credit happens within the
+  // same operation/transition.
+  DAO.credit' = DAO.credit ++ (sender -> 0)
+
   call[Invocation.param, none, DAO.credit[sender]]
 }
 
@@ -203,7 +210,10 @@ pred dao_withdraw_return {
   active_obj = DAO and Invocation.op = Return
 
   // set sender's credit to 0 since their credit has now been emptied
-  // DAO.credit' = DAO.credit ++ (sender -> 0) // VULN: comment this to fix vuln.
+  // VULNERABILITY_FIX: this no longer happens in this operation and instead
+  // happens in the same one as the one where the DAO calls to transfer some
+  // of its balance to an object.
+  // DAO.credit' = DAO.credit ++ (sender -> 0)
   
   return
 }
@@ -274,40 +284,53 @@ pred DAO_inv {
 
 // FILL IN HERE
 
-// TODO: clean up before submission
+/*
+ * This check asserts that if some non-DAO object calls the DAO to transfer
+ * its credit (either to itself or to other objects), there should only ever
+ * be one stackframe describing this call in the callstack. What this means is
+ * that a non-DAO object cannot call the DAO to withdraw its credit multiple
+ * times in the same stack (recursively).
+ *
+ * The reason why we think this assertion characterises a security property of
+ * the DAO is derived from the fact that when the DAO is called by an object,
+ * the reduction of the DAO's balance and the update of the object's credit to
+ * 0 are not atomic (happen in separate transitions). Therefore, a potential
+ * attack on the system could play out in the following steps of actions:
+ * 1. Attacker object A calls the DAO to withdraw its credit to itself.
+ *    call[DAO, A, 0]
+ * 2. This will lead to the DAO calling the object A to transfer some amount
+ *    from the DAO's balance to A.
+ *    dao_withdraw_call (which will call A)
+ * 3. A is now the active object, and can call the DAO again to withdraw its
+ *    credit (which should be 0 now) to itself again.
+ *    call[DAO, A, 0]
+ * 4. The DAO calls A again to transfer its balance to A (an attack!).
+ *    dao_withdraw_call (which will call A)
+ *
+ * Step 4 above should not actually reduce the DAO's balance because A's credit
+ * should have been 0 from the first call, but it's not because its credit is
+ * only updated when A returns to the DAO, which hasn't happened yet. Instead,
+ * now A seemingly has infinite credit as it can keep withdrawing its credit to
+ * transfer to any object of its choosing, which violates the DAO_inv invariant.
+ *
+ */
 assert no_infinite_withdrawal {
-// stack could only contain one stackframe of an object calling the DAO?
   always {
     all sf : StackFrame, o : (Object - DAO) |
-    (sf.caller = o and sf.callee = DAO and sf in Stack.callstack.elems) => one Stack.callstack.indsOf[sf]
+    {
+      sf.caller = o
+      sf.callee = DAO
+      sf in Stack.callstack.elems
+    } => one Stack.callstack.indsOf[sf]
   }
-
-//  always {
-//    all sf : Stack.callstack.elems, o : (Object - DAO) |
-//    (sf.caller = o and sf.callee = DAO) => one Stack.callstack.indsOf[sf]
-//  }
-
-  // for all non-DAO objects, if calling the DAO on the object results in the
-  // invariant not holding, it should be the case that eventually the op
-  // `dao_withdraw_return` holds and the invariant gets restored
-//   all o : (Object - DAO), amt : one Int |
-//   {
-//    active_obj != DAO and
-//     call[DAO, o, amt] and
-//     after (dao_withdraw_call and after (not DAO_inv))
-//   } => after after (eventually (dao_withdraw_return and DAO_inv))
-
-  // (dao_withdraw_call and after (not DAO_inv)) => after (eventually DAO_inv)
-
-//  all o : (Object - DAO), amt : one Int |
-//  {
-//    (active_obj != DAO and call[DAO, o, amt]) => after (eventually DAO_inv)
-//  }
 }
 
 check no_infinite_withdrawal
 
-// check that objects can transfer balance to another non-DAO object
+//////////////////////////////////////////////////////////////////////
+// Checks for legitimate behaviour
+
+// check that an object can transfer its balance to another non-DAO object
 objs_can_transfer_balance: run {
   some o1, o2 : (Object - DAO), arg : Data |
   {
@@ -323,7 +346,7 @@ objs_can_transfer_balance: run {
   }
 } for 3
 
-// check that objects can transfer credit to another non-DAO object
+// check that an object can transfer its credit to another non-DAO object
 objs_can_transfer_credit: run {
   some o1, o2 : (Object - DAO) |
     {
@@ -343,7 +366,7 @@ objs_can_transfer_credit: run {
     }
 } for 3
 
-// check that objects can withdraw credit for themselves
+// check that an object can withdraw its credit to itself
 objs_can_withdraw_to_self: run {
   some objA : (Object - DAO) |
   {
@@ -371,3 +394,4 @@ objs_can_withdraw_to_self: run {
     }
   }
 } for 3
+
