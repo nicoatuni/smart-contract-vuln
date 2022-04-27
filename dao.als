@@ -214,7 +214,8 @@ pred dao_withdraw_return {
   // happens in the same one as the one where the DAO calls to transfer some
   // of its balance to an object.
   // DAO.credit' = DAO.credit ++ (sender -> 0)
-  
+  DAO.credit' = DAO.credit
+
   return
 }
 
