@@ -286,47 +286,58 @@ pred DAO_inv {
 // FILL IN HERE
 
 /*
- * This check asserts that if some non-DAO object calls the DAO to transfer
- * its credit (either to itself or to other objects), there should only ever
- * be one stackframe describing this call in the callstack. What this means is
- * that a non-DAO object cannot call the DAO to withdraw its credit multiple
- * times in the same stack (recursively).
+ * This check asserts that the DAO_inv invariant needs to eventually hold
+ * every time an object calls on the DAO to withdraw its credit. This
+ * describes a security requirement of the DAO that any operation that could
+ * violate the DAO_inv only do so temporarily.
  *
- * The reason why we think this assertion characterises a security property of
- * the DAO is derived from the fact that when the DAO is called by an object,
- * the reduction of the DAO's balance and the update of the object's credit to
- * 0 are not atomic (happen in separate transitions). Therefore, a potential
- * attack on the system could play out in the following steps of actions:
- * 1. Attacker object A calls the DAO to withdraw its credit to itself.
- *    call[DAO, A, 0]
- * 2. This will lead to the DAO calling the object A to transfer some amount
- *    from the DAO's balance to A.
- *    dao_withdraw_call (which will call A)
- * 3. A is now the active object, and can call the DAO again to withdraw its
- *    credit (which should be 0 now) to itself again.
- *    call[DAO, A, 0]
- * 4. The DAO calls A again to transfer its balance to A (an attack!).
- *    dao_withdraw_call (which will call A)
+ * The reason why we think this assertion characterises a security property
+ * of the DAO is derived from the fact that when the DAO is called by an
+ * object, the reduction of the DAO's balance and the update of the object's
+ * credit to 0 are not atomic (happen in separate transitions). Some object A
+ * calling on the DAO to withdraw its credit to itself will lead to the
+ * invariant being violated temporarily, but our expectation is that it gets
+ * restored again soon. However, an attack on the system is possible with the
+ * following steps:
+ * 1. Attacker object A calls the DAO to withdraw credit to itself.
+ *    `call[DAO, A, 0]`
+ * 2. The DAO will then call A to transfer its balance to A.
+ *    `dao_withdraw_call` (which will call A and transfer its credit to itself)
+ * 3. A is now the active object, and the invariant is now violated (as A
+ *    has had its balance increased, but its credit record has not been updated
+ *    yet by the DAO).
  *
- * Step 4 above should not actually reduce the DAO's balance because A's credit
- * should have been 0 from the first call, but it's not because its credit is
- * only updated when A returns to the DAO, which hasn't happened yet. Instead,
- * now A seemingly has infinite credit as it can keep withdrawing its credit to
- * transfer to any object of its choosing, which violates the DAO_inv invariant.
- *
+ * After step 3 above, we expect that A returns so the DAO has the chance to
+ * update A's credit to be 0, restoring the invariant. However, it is possible
+ * and technically allowed that A continues to call the DAO to withdraw some
+ * more credit to itself, which will repeat the steps 1-3 above in a cycle.
+ * After doing this for several cycles, A then returns, but the invariant is
+ * now unable to be restored because the DAO has lost more balance than was
+ * available for A to withdraw.
+ * 
  */
-assert no_infinite_withdrawal {
+assert no_permanent_invariant_violation {
   always {
-    all sf : StackFrame, o : (Object - DAO) |
-    {
-      sf.caller = o
-      sf.callee = DAO
-      sf in Stack.callstack.elems
-    } => one Stack.callstack.indsOf[sf]
+    dao_withdraw_call => eventually DAO_inv
   }
 }
 
-check no_infinite_withdrawal
+/*
+ * After incorporating the fix (parts of the code annotated with
+ * `VULNERABILITY_FIX`), it seems like the assertion above now holds. We set
+ * the bounds to be `7 seq` so that we could have more interactions between the
+ * objects play out. We chose 3 for the number of objects because it is large
+ * enough to showcase the attack in action, but small enough to enable Alloy
+ * to reason about when the DAO_inv invariant could be restored after being
+ * violated. We believe that this helps provide some guarantees that for some
+ * relatively small number of objects the invariant should always eventually
+ * hold. However, it is possible that for larger numbers of objects with a small
+ * search space Alloy is unable to reach the state where the invariant
+ * eventually holds because the cycle of objects calling one another before
+ * returning is massive.
+ *
+ */
+check no_permanent_invariant_violation for 3 but 7 seq
 
 //////////////////////////////////////////////////////////////////////
 // Checks for legitimate behaviour
