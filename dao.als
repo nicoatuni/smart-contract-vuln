@@ -1,6 +1,6 @@
 // SWEN90010 2022 Assignment 2
 //
-// Submission by: <insert your names and student numbers here>
+// Submission by: Liguo Chen (851090) and Nico Eka Dinata (770318)
 
 //////////////////////////////////////////////////////////////////////
 // don't delete this line (imposes an ordering on the atoms in the Object set
@@ -91,8 +91,9 @@ fun returnee: Object {
 pred objects_unchanged[objs: set Object] {
   // FILL IN THIS DEFINITION
   all obj : objs | obj.balance' = obj.balance
-  all dao : DAO & objs | dao.credit' = dao.credit
-  //all o : objs | o in DAO => o.credit' = o.credit
+  DAO in objs => DAO.credit' = DAO.credit
+  // or the below
+  // all dao : DAO & objs | dao.credit' = dao.credit
 }
 
 check all_objects_unchanged_correct {
@@ -123,40 +124,57 @@ check object_unchanged_balance {
 // 'dest'. If 'amt' is 0, no funds are transferred.
 pred call[dest: Object, arg: lone Data, amt: one Int] {
   // FILL IN HERE
+
+  // can only occur when:
+  // - `amt` >= 0
+  // - `amt` doesn't exceed balance of currently active object
   amt >= 0 and amt <= active_obj.balance
-  // TODO: how to check if the stack reaches its max ???
-  // Stack.callstack.add [{(caller = active_obj), (callee=dest)}]
-  one sf : StackFrame | 
-    sf.caller = active_obj and 
-    sf.callee = dest and 
-    Stack.callstack' = Stack.callstack.add[sf]
-  Invocation.op = Call
-  Invocation.param = arg
-  active_obj.balance' = active_obj.balance - amt
-  dest.balance' = dest.balance + amt
-  all other : Object - (active_obj + dest) | other.balance' = other.balance
-  // If the active object who made the call is not The DAO, then no object’s credit can change.
-  // active_obj & DAO = none => 
-  //   all obj : DAO.credit.Int | 
-  //     DAO.credit[obj]' = DAO.credit[obj]
-  // ??????????????????????????
+
+  // push new stack frame onto stack if not exceeding seq length bound
+  one sf : StackFrame |
+    sf.caller = active_obj and
+    sf.callee = dest and
+    Stack.callstack' = Stack.callstack.add[sf] and
+    #(Stack.callstack') = add[#(Stack.callstack), 1]
+
+  // update `Invocation`
+  Invocation.op' = Call
+  Invocation.param' = arg
+
+  // deduct `amt` from balance of active object
+  active_obj.balance' = sub[active_obj.balance, amt]
+
+  // add `amt` to balance of `dest`
+  dest.balance' = add[dest.balance, amt]
+
+  // balance of all other objects are unchanged
+  all o : (Object - active_obj - dest) | o.balance' = o.balance
+
+  // if active object is not the DAO, then no credit can change
+  active_obj != DAO => DAO.credit' = DAO.credit
 }
 
 // return
 // holds when the active object returns to its caller
 pred return {
   // FILL IN HERE
-  // there are elements in the callstack set
+
+  // callstack cannot be empty
   not Stack.callstack.isEmpty
-  // update the callstack
-  Stack.callstack' = Stack.callstack.delete[Stack.callstack.lastIdx]
-  Invocation.op = Return
-  Invocation.param = none
-  // all non-dao objs unchanged
+
+  // set invocation
+  Invocation.op' = Return
+  Invocation.param' = none
+
+  // pop top stack frame from the stack
+  Stack.callstack' = Stack.callstack.butlast
+
+  // balance of all objects cannot change
   all o : Object | o.balance' = o.balance
-  // If the active object who did the return is not The DAO, then no object’s credit can change.
-  // TODO: need a check for the above ???
-  }
+
+  // if active object who returned is not the DAO, then no credit can change
+  active_obj != DAO => DAO.credit' = DAO.credit
+}
 
 
 
@@ -169,7 +187,15 @@ pred dao_withdraw_call {
   active_obj = DAO and Invocation.op = Call
 
   // DAO credit doesn't change (the caller's credit is deducted after the call below returns
-  //credit' = credit
+  // VULNERABILITY_FIX: this no longer holds because we _do_ want to update
+  // the credit of the calling object to 0 atomically with the DAO transferring
+  // some its balance to another object.
+  // credit' = credit
+
+  // VULNERABILITY_FIX: this gets added to make sure the transferring of the
+  // DAO's balance and the updating of the object's credit happens within the
+  // same operation/transition.
+  DAO.credit' = DAO.credit ++ (sender -> 0)
 
   // update credit and make call at the same time
   DAO.credit' = DAO.credit ++ (sender -> 0)
@@ -186,8 +212,12 @@ pred dao_withdraw_return {
   active_obj = DAO and Invocation.op = Return
 
   // set sender's credit to 0 since their credit has now been emptied
-  //DAO.credit' = DAO.credit ++ (sender -> 0)
-  
+  // VULNERABILITY_FIX: this no longer happens in this operation and instead
+  // happens in the same one as the one where the DAO calls to transfer some
+  // of its balance to an object.
+  // DAO.credit' = DAO.credit ++ (sender -> 0)
+  DAO.credit' = DAO.credit
+
   return
 }
 
@@ -243,11 +273,12 @@ fact init {
 
 pred DAO_inv {
   // FILL IN HERE
-  all dao : DAO |
-    dao.balance = sum_DAO_credit and
-    // use the relational join (.) to get the domain of the dao.credit, i.e. all objects the dao is storing credit for
-    all o : dao.credit.Int |
-      o.balance >= 0
+
+  // DAO's balance is sufficient to cover all other objects' credits
+  DAO.balance >= sum_DAO_credit
+
+  // Credit of each other object is non-negative
+  all o : (Object - DAO) | DAO.credit[o] >= 0
 }
 
 assert q3 {
@@ -263,4 +294,126 @@ check q3 for 7 seq
 // Finding the attack
 
 // FILL IN HERE
+
+/*
+ * This check asserts that the DAO_inv invariant needs to eventually hold
+ * every time an object calls on the DAO to withdraw its credit. This
+ * describes a security requirement of the DAO that any operation that could
+ * violate the DAO_inv only do so temporarily.
+ *
+ * The reason why we think this assertion characterises a security property
+ * of the DAO is derived from the fact that when the DAO is called by an
+ * object, the reduction of the DAO's balance and the update of the object's
+ * credit to 0 are not atomic (happen in separate transitions). Some object A
+ * calling on the DAO to withdraw its credit to itself will lead to the
+ * invariant being violated temporarily, but our expectation is that it gets
+ * restored again soon. However, an attack on the system is possible with the
+ * following steps:
+ * 1. Attacker object A calls the DAO to withdraw credit to itself.
+ *    `call[DAO, A, 0]`
+ * 2. The DAO will then call A to transfer its balance to A.
+ *    `dao_withdraw_call` (which will call A and transfer its credit to itself)
+ * 3. A is now the active object, and the invariant is now violated (as A
+ *    has had its balance increased, but its credit record has not been updated
+ *    yet by the DAO).
+ *
+ * After step 3 above, we expect that A returns so the DAO has the chance to
+ * update A's credit to be 0, restoring the invariant. However, it is possible
+ * and technically allowed that A continues to call the DAO to withdraw some
+ * more credit to itself, which will repeat the steps 1-3 above in a cycle.
+ * After doing this for several cycles, A then returns, but the invariant is
+ * now unable to be restored because the DAO has lost more balance than was
+ * available for A to withdraw.
+ * 
+ */
+assert no_permanent_invariant_violation {
+  always {
+    dao_withdraw_call => eventually DAO_inv
+  }
+}
+
+/*
+ * After incorporating the fix (parts of the code annotated with
+ * `VULNERABILITY_FIX`), it seems like the assertion above now holds. We set
+ * the bounds to be `7 seq` so that we could have more interactions between the
+ * objects play out. We chose 3 for the number of objects because it is large
+ * enough to showcase the attack in action, but small enough to enable Alloy
+ * to reason about when the DAO_inv invariant could be restored after being
+ * violated. We believe that this helps provide some guarantees that for some
+ * relatively small number of objects the invariant should always eventually
+ * hold. However, it is possible that for larger numbers of objects with a small
+ * search space Alloy is unable to reach the state where the invariant
+ * eventually holds because the cycle of objects calling one another before
+ * returning is massive.
+ *
+ */
+check no_permanent_invariant_violation for 3 but 7 seq
+
+//////////////////////////////////////////////////////////////////////
+// Checks for legitimate behaviour
+
+// check that an object can transfer its balance to another non-DAO object
+objs_can_transfer_balance: run {
+  some o1, o2 : (Object - DAO), arg : Data |
+  {
+    o1.balance = 1
+    o2.balance = 0
+    active_obj = o1
+    call[o2, arg, 1]
+    after {
+      active_obj = o2
+      o1.balance = 0
+      o2.balance = 1
+    }
+  }
+} for 3
+
+// check that an object can transfer its credit to another non-DAO object
+objs_can_transfer_credit: run {
+  some o1, o2 : (Object - DAO) |
+    {
+      o1.balance = 1
+      o2.balance = 0
+      active_obj = o1
+      DAO.balance = 1
+      DAO.credit[o1] = 1
+      call[DAO, o2, 0]
+      after {
+        dao_withdraw_call
+        after {
+          o2.balance = 1
+          DAO.credit[o1] = 0
+        }
+      }
+    }
+} for 3
+
+// check that an object can withdraw its credit to itself
+objs_can_withdraw_to_self: run {
+  some objA : (Object - DAO) |
+  {
+    #(Stack.callstack) = 1
+    objA.balance = 1
+    active_obj = objA
+    DAO.balance = 1
+    DAO.credit[objA] = 1
+    call[DAO, objA, 0]
+    after {
+      dao_withdraw_call
+      after {
+        DAO.credit[objA] = 0
+        objA.balance = 2
+        active_obj = objA
+        return
+        after {
+          active_obj != objA
+          DAO.credit[objA] = 0
+          objA.balance = 2
+          dao_withdraw_return
+          after (#(Stack.callstack) = 1)
+        }
+      }
+    }
+  }
+} for 3
 
